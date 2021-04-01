@@ -3,6 +3,9 @@ package com.example.criminalactivitesapp;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -11,6 +14,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -27,6 +31,10 @@ public class CrimeListFragment extends Fragment {
     private RecyclerView crimeRecyclerView;
     private CrimeAdapter crimeAdapter;
 
+    private boolean isSubtitleVisible;
+
+    private static final String SUBTITLE_VISIBLE = "subtitle_visible";
+
 
     @Nullable
     @Override
@@ -36,9 +44,96 @@ public class CrimeListFragment extends Fragment {
         crimeRecyclerView = view.findViewById(R.id.crime_recycler_view);
         crimeRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
 
+        // Get the isSubtitleVisible variable if saved already in the state
+        if(savedInstanceState != null){
+            isSubtitleVisible = savedInstanceState.getBoolean(SUBTITLE_VISIBLE);
+        }
+
+        updateSubtitle();
+
+        // Used to call onCreateOptionsMenu() for this fragment
+        setHasOptionsMenu(true);
+
         updateUI();
 
         return view;
+    }
+
+    /**
+     * Save the boolean variable isSubtitleVisible so that the subtitle would not hide
+     * in case of screen rotation or any other configuration changes
+     * */
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean(SUBTITLE_VISIBLE, isSubtitleVisible);
+    }
+
+    /**
+     * Callback method. Called whenever menu options are created
+     * Called by fragment manager
+     * */
+    @Override
+    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
+        super.onCreateOptionsMenu(menu, inflater);
+
+        inflater.inflate(R.menu.fragment_crime_list, menu);
+
+        // Get the menu item of show/hide subtitle and change its text
+        // according to the option selected
+        MenuItem item = menu.findItem(R.id.show_subtitle);
+        if(isSubtitleVisible){
+            item.setTitle(R.string.hide_subtitle);
+        } else{
+            item.setTitle(R.string.show_subtitle);
+        }
+
+    }
+
+    /**
+     * Called when any of the menu item is clicked
+     * */
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+
+        switch (item.getItemId()){
+            // Check if the menu item clicked is new_crime
+            case R.id.new_crime:
+                Crime crime  = new Crime();
+                CrimeLab.get(getActivity()).addCrime(crime);
+
+                // Start crime pager activity so that user can add the details of crime
+                Intent intent = CrimePagerActivity.newIntent(getActivity(), crime.getCrimeId());
+                startActivity(intent);
+                return true;
+
+            case R.id.show_subtitle:
+                isSubtitleVisible = !isSubtitleVisible;     // Toggle the menu
+                getActivity().invalidateOptionsMenu();      // Update the options of menu
+
+                updateSubtitle();
+                return true;
+
+            default:
+                return super.onOptionsItemSelected(item);
+        }
+
+    }
+
+    private void updateSubtitle() {
+        CrimeLab lab = CrimeLab.get(getActivity());
+        int count = lab.getAllCrimes().size();
+        String subtitle = getString(R.string.subtitle_format, count);
+
+        // Remove the subtitle if hide subtitle is selected
+        if(!isSubtitleVisible){
+            subtitle = null;
+        }
+
+        // Set the subtitle on the activity
+        AppCompatActivity activity = (AppCompatActivity) getActivity();
+        activity.getSupportActionBar().setSubtitle(subtitle);
+
     }
 
     @Override
@@ -54,8 +149,9 @@ public class CrimeListFragment extends Fragment {
             crimeAdapter = new CrimeAdapter(crimes);
             crimeRecyclerView.setAdapter(crimeAdapter);
         } else{
-            crimeAdapter.notifyDataSetChanged();
+            crimeAdapter.setCrimes(crimes);
         }
+        crimeAdapter.notifyDataSetChanged();
     }
 
 
@@ -134,6 +230,10 @@ public class CrimeListFragment extends Fragment {
         @Override
         public int getItemViewType(int position) {
             return allCrimes.get(position).getCrimeType();
+        }
+
+        public void setCrimes(List<Crime> crimes) {
+            allCrimes = crimes;
         }
     }
 }
